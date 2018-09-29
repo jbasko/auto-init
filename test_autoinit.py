@@ -1,4 +1,6 @@
-from autoinit import auto_init_class, AutoInitContext
+from typing import List, Dict
+
+from auto_init import auto_init_class, AutoInitContext
 
 
 @auto_init_class(singleton=True)
@@ -94,3 +96,96 @@ def test_singletons_are_not_shared_across_contexts():
 
     assert s20 is not s10
     assert s20 is not s00
+
+
+def test_none_as_providers():
+    @auto_init_class(singleton=True)
+    class App:
+        pass
+
+    @auto_init_class
+    class Installer:
+        pass
+
+    @auto_init_class
+    class Components:
+        app: App
+        installer: Installer
+
+    assert App() is not None
+    assert Components().app is App()
+
+    with AutoInitContext(providers={App: None}):
+        assert App() is None
+        assert Components().app is None
+        assert Components().installer is not None
+
+    assert App() is not None
+    assert Components().app is App()
+
+
+def test_gui_example():
+    from auto_init import auto_init_class
+
+    @auto_init_class(singleton=True)
+    class AppModel:
+        pass
+
+    @auto_init_class
+    class AppPresenter:
+        model: AppModel
+
+    @auto_init_class
+    class AppView:
+        model: AppModel
+
+    @auto_init_class
+    class App:
+        model: AppModel
+        view: AppView
+        presenter: AppPresenter
+
+    app = App()
+    assert isinstance(app.model, AppModel)
+    assert app.model is app.view.model
+    assert app.view.model is app.presenter.model
+
+    with AutoInitContext(providers={AppModel: None}):
+        app2 = App()
+        assert app2.model is None
+
+
+def test_init_example():
+    @auto_init_class
+    class Point:
+        x: int
+        y: int
+
+        def __init__(self, *args):
+            if args:
+                self.x, self.y = args
+
+        @property
+        def xy(self):
+            return self.x, self.y
+
+    p = Point(2, 3)
+    assert p.xy == (2, 3)
+
+
+def test_initialises_lists_and_dicts():
+    @auto_init_class
+    class Item:
+        name: str
+        values: List
+
+    @auto_init_class
+    class Selection:
+        items: List[Item]
+        tags: Dict[str, str]
+
+    assert Item().name == ''
+    assert Item().values == []
+
+    assert Selection().items == []
+    assert Selection().tags == {}

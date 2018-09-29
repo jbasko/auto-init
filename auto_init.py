@@ -6,7 +6,45 @@ from __future__ import annotations
 __version__ = '0.0.1'
 
 from contextvars import ContextVar
-from typing import get_type_hints, List, Type, Any, Dict, ClassVar, Callable
+from typing import get_type_hints, List, Type, Any, Dict, ClassVar, Callable, Optional
+
+
+class InstanceType(str):
+    """
+    Type annotations helper. Represents a type hint as a string.
+    """
+
+    def __new__(cls, instance_type):
+        s = super().__new__(cls, instance_type)
+        s._instance_type = instance_type
+        return s
+
+    @property
+    def is_list(self):
+        return self.startswith('typing.List[') or self == 'typing.List'
+
+    @property
+    def is_dict(self):
+        return self.startswith('typing.Dict[') or self == 'typing.Dict'
+
+    @property
+    def is_classvar(self):
+        return self.startswith('typing.ClassVar[') or self == 'typing.ClassVar'
+
+    @property
+    def factory(self) -> Type:
+        if self.is_list:
+            return list
+        elif self.is_dict:
+            return dict
+        else:
+            return self._instance_type
+
+    def __call__(self, *args, **kwargs):
+        """
+        Create a new instance of this type.
+        """
+        return self.factory(*args, **kwargs)
 
 
 class AutoInitContext:
@@ -29,17 +67,25 @@ class AutoInitContext:
 
     current: AutoInitContext = _CurrentAutoInitContext()
 
-    def __init__(self, providers: Dict[Type, Callable]=None):
+    def __init__(self, providers: Dict[Type, Any]=None):
         self._providers = providers or {}
         self._singletons = {}
 
-    def get_provider(self, instance_type: Type) -> Callable:
+    def get_provider(self, instance_type: Type) -> Optional[Callable]:
         """
-        Return a callable (could be a class) to be used to create a new instance
+        Return a callable to be used to create a new instance
         of type `instance_type`.
-        Returns None if there is no provider configured for this `instance_type`.
+        If the registered provider is not a callable, this will return a function
+        that returns the provider.
+        If there is no registered provider, will return None.
         """
-        return self._providers.get(instance_type, None)
+        provider = self._providers.get(instance_type, self.NOT_SET)
+        if provider is self.NOT_SET:
+            return None
+        elif callable(provider):
+            return provider
+        else:
+            return lambda: provider
 
     def get_instance(self, instance_type: Type, default: Any=NOT_SET) -> Any:
         """
@@ -52,7 +98,7 @@ class AutoInitContext:
             if default is not self.NOT_SET:
                 return default
             else:
-                return instance_type()
+                return InstanceType(instance_type)()
         else:
             return provider()
 
@@ -84,8 +130,8 @@ def collect_attrs(cls: Type):
     Get names and types of all attributes in a class that will be auto-initialised on instance creation.
     """
     for k, v in get_type_hints(cls).items():
-        type_str = str(v)
-        if type_str.startswith('typing.ClassVar'):
+        instance_type = InstanceType(v)
+        if instance_type.is_classvar:
             continue
         yield k, v
 
@@ -122,36 +168,6 @@ def auto_init_class(cls=None, singleton=False, repr=True, **cls_options):
     The original class can have an __init__ method. It should accept keyword arguments.
     Anything that is not listed in the type annotations will be passed on to the original
     class's __init__ method AFTER init_attrs have run.
-
-    ** Feature: singleton=True **
-
-    If a class is marked as a singleton, only one instance of it will be created.
-
-    ** Feature: _auto_init_base and auto_init_base=True **
-
-    To access the original class, use cls._auto_init_base.
-    To create an instance of the original class, you can also pass keyword argument auto_init_base=True
-    on object creation:
-
-        @auto_init_class
-        class C:
-            pass
-
-        c = C(auto_init_base=True)
-        assert isinstance(c, C._auto_init_base)
-
-    Passing auto_init_base=True to a singleton class will circumvent the singleton logic
-    and return a new instance of the original class.
-
-    ** Feature: with auto_init_context(): **
-
-    If you want to have more control over object initialisation, for example, to specify
-    factory methods or classes which should be used to construct instances of certain types,
-    you can use an AutoInitContext and supply a mapping of _providers.
-
-        context = AutoInitContext(_providers={Point: Point3d})
-
-    This will make all Point-typed attributes created with Point3d.
 
     """
 
@@ -195,15 +211,14 @@ def auto_init_class(cls=None, singleton=False, repr=True, **cls_options):
                         return super(C, cls).__new__(cls)
 
             def __init__(self, *args, **kwargs):
-                assert not args
                 if not self._auto_init_attrs_called:
                     # When an auto_init_class inherits another, __init__ will
                     # be called in each of the classes. It is sufficient to
-                    # execute init_attrs in the final class only as type annotations
-                    # are collected from all base classes.
+                    # execute init_attrs just in the final class as type annotations
+                    # are collected from all the base classes.
                     self._auto_init_attrs_called = True
                     init_attrs(self, kwargs, consume=True, auto_init=True)
-                super().__init__(**kwargs)
+                super().__init__(*args, **kwargs)
 
             def __eq__(self, other):
                 if not isinstance(other, C):
