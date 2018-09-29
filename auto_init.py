@@ -240,11 +240,6 @@ def auto_init_class(cls=None, singleton=False, repr=True, **cls_options):
                     init_attrs(self, kwargs, consume=True, auto_init=True)
                 super().__init__(*args, **kwargs)
 
-            def __eq__(self, other):
-                if not isinstance(other, C):
-                    return NotImplemented
-                return self.__dict__ == other.__dict__
-
             if '__repr__' not in c.__dict__ and repr is True:
 
                 def __repr__(self):

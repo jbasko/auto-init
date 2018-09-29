@@ -38,7 +38,7 @@ class Line:
 
 
 def test_basics():
-    assert Point() == Point()
+    assert Point().__dict__ == Point().__dict__
     assert Point().label is None
     assert callable(Point._auto_init_base)
     assert Point(auto_init_base=True) != Point()
