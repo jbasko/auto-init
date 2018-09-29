@@ -9,6 +9,10 @@ from contextvars import ContextVar
 from typing import get_type_hints, List, Type, Any, Dict, ClassVar, Callable, Optional
 
 
+def none_factory(*args, **kwargs):
+    return None
+
+
 class InstanceType(str):
     """
     Type annotations helper. Represents a type hint as a string.
@@ -18,6 +22,14 @@ class InstanceType(str):
         s = super().__new__(cls, instance_type)
         s._instance_type = instance_type
         return s
+
+    @property
+    def is_typing(self):
+        return self.startswith('typing.')
+
+    @property
+    def is_forward_ref(self):
+        return self.startswith('ForwardRef(')
 
     @property
     def is_list(self):
@@ -33,10 +45,15 @@ class InstanceType(str):
 
     @property
     def factory(self) -> Type:
-        if self.is_list:
-            return list
-        elif self.is_dict:
-            return dict
+        if self.is_typing:
+            if self.is_list:
+                return list
+            elif self.is_dict:
+                return dict
+            else:
+                return none_factory
+        elif self.is_forward_ref:
+            return none_factory
         else:
             return self._instance_type
 
@@ -44,7 +61,10 @@ class InstanceType(str):
         """
         Create a new instance of this type.
         """
-        return self.factory(*args, **kwargs)
+        try:
+            return self.factory(*args, **kwargs)
+        except TypeError:
+            raise
 
 
 class AutoInitContext:

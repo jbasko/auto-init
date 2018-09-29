@@ -1,4 +1,8 @@
-from typing import List, Dict
+# Do NOT do "from __future__ import annotations" here because it breaks
+# everything. Maybe pytest issue?
+
+
+from typing import List, Dict, Iterator
 
 from auto_init import auto_init_class, AutoInitContext
 
@@ -183,9 +187,13 @@ def test_initialises_lists_and_dicts():
     class Selection:
         items: List[Item]
         tags: Dict[str, str]
+        keys: Iterator[str]
 
     assert Item().name == ''
     assert Item().values == []
 
     assert Selection().items == []
     assert Selection().tags == {}
+
+    # Do not initialise what you don't know how to initialise
+    assert Selection().keys is None
