@@ -14,7 +14,7 @@ def read(fname):
 
 setup(
     name='auto-init',
-    version='0.0.1',
+    version='0.0.2',
     packages=['auto_init'],
     url='https://github.com/jbasko/auto-init',
     license='MIT',

@@ -2,9 +2,9 @@
 # everything. Maybe pytest issue?
 
 
-from typing import List, Dict, Iterator
+from typing import Dict, Iterator, List
 
-from auto_init import auto_init_class, AutoInitContext
+from auto_init import AutoInitContext, auto_init_class
 
 
 @auto_init_class(singleton=True)
@@ -54,6 +54,8 @@ def test_access_to_singletons_base_via_auto_init_base():
 
 
 def test_derived_class_inherits_all_attributes():
+    assert Point in Point3d.__mro__
+
     p3d = Point3d(x=1, z=3)
     assert p3d._auto_init_attrs == ['x', 'y', 'z']
     assert p3d.x == 1
@@ -175,6 +177,9 @@ def test_init_example():
 
     p = Point(2, 3)
     assert p.xy == (2, 3)
+
+    p = Point(y=5, x=4)
+    assert p.xy == (4, 5)
 
 
 def test_initialises_lists_and_dicts():

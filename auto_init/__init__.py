@@ -3,10 +3,10 @@ Dataclasses reinvented + dependency injection. Python 3.7+
 """
 from __future__ import annotations
 
-__version__ = '0.0.1'
-
 from contextvars import ContextVar
-from typing import get_type_hints, List, Type, Any, Dict, ClassVar, Callable, Optional
+from typing import Any, Callable, ClassVar, Dict, List, Optional, Set, Tuple, Type, get_type_hints
+
+__version__ = '0.0.2'
 
 
 def none_factory(*args, **kwargs):
@@ -87,8 +87,9 @@ class AutoInitContext:
 
     current: AutoInitContext = _CurrentAutoInitContext()
 
-    def __init__(self, providers: Dict[Type, Any]=None):
+    def __init__(self, providers: Dict[Type, Any]=None, singleton_types: Set[Type]=None):
         self._providers = providers or {}
+        self._singleton_types = singleton_types or set()
         self._singletons = {}
 
     def get_provider(self, instance_type: Type) -> Optional[Callable]:
@@ -97,7 +98,7 @@ class AutoInitContext:
         of type `instance_type`.
         If the registered provider is not a callable, this will return a function
         that returns the provider.
-        If there is no registered provider, will return None.
+        If there is no registered provider, this will return None.
         """
         provider = self._providers.get(instance_type, self.NOT_SET)
         if provider is self.NOT_SET:
@@ -107,20 +108,23 @@ class AutoInitContext:
         else:
             return lambda: provider
 
-    def get_instance(self, instance_type: Type, default: Any=NOT_SET) -> Any:
+    def get_instance(self, instance_type: Type, args: Tuple=None, kwargs: Dict=None) -> Any:
         """
         Create a new instance of type `instance_type`.
         If no custom provider is set and `default` is provided, `default` will be returned.
         Otherwise, `instance_type` will be called to create a new instance.
         """
+        if instance_type in self._singleton_types and instance_type in self._singletons:
+            return self._singletons[instance_type]
+
         provider = self.get_provider(instance_type)
         if provider is None:
-            if default is not self.NOT_SET:
-                return default
-            else:
-                return InstanceType(instance_type)()
-        else:
-            return provider()
+            provider = InstanceType(instance_type)
+
+        instance = provider(*(args or ()), **(kwargs or {}))
+        if instance_type in self._singleton_types:
+            self._singletons[instance_type] = instance
+        return instance
 
     def has_singleton(self, instance_type: Type) -> bool:
         return instance_type in self._singletons
@@ -130,6 +134,19 @@ class AutoInitContext:
 
     def set_singleton(self, instance_type: Type, instance: Any):
         self._singletons[instance_type] = instance
+
+    def auto_init(self, instance_type: Type, args: Tuple=None, kwargs: Dict=None, attrs: Dict=None) -> Any:
+        """
+        Auto-initialise an instance of the specified type.
+        With this you can auto-initialise instance of "any" type without
+        the need to decorate it with @auto_init_class.
+
+        args and kwargs will be passed to the original initialiser of the instance.
+        attrs will be passed to the auto-init's init_attrs.
+        """
+        instance = self.get_instance(instance_type=instance_type, args=args, kwargs=kwargs)
+        init_attrs(instance, attrs=attrs or {})
+        return instance
 
     def __enter__(self):
         if auto_init_context_stack.get() is None:
@@ -173,7 +190,7 @@ def init_attrs(instance: Any, attrs: Dict[str, Any], consume=True, auto_init=Tru
                 if hasattr(instance.__class__, k):
                     setattr(instance, k, getattr(instance.__class__, k))
                 else:
-                    setattr(instance, k, AutoInitContext.current.get_instance(v))
+                    setattr(instance, k, AutoInitContext.current.auto_init(v))
 
 
 def auto_init_class(cls=None, singleton=False, repr=True, **cls_options):
@@ -261,3 +278,11 @@ def auto_init_class(cls=None, singleton=False, repr=True, **cls_options):
         return decorator
     else:
         return decorator(cls)
+
+
+def auto_init(instance_type: Type, args: Tuple=None, kwargs: Dict=None, attrs: Dict=None) -> Any:
+    """
+    Create and auto-initialise an instance of type `instance_type` within the current AutoInitContext.
+    If you are outside of any explicit AutoInitContext, the global context will be used.
+    """
+    return AutoInitContext.current.auto_init(instance_type, args=args, kwargs=kwargs, attrs=attrs)
