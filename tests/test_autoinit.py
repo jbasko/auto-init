@@ -202,3 +202,8 @@ def test_initialises_lists_and_dicts():
 
     # Do not initialise what you don't know how to initialise
     assert Selection().keys is None
+
+
+def test_entering_context_returns_itself():
+    with AutoInitContext() as auto_init_context:
+        assert isinstance(auto_init_context, AutoInitContext)

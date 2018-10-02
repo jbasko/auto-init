@@ -42,8 +42,16 @@ annotations.
     assert line.end.y == 0
 
 
-Class With auto-init
---------------------
+If you have an instance of ``AutoInitContext`` available, you can call ``auto_init`` on it:
+
+.. code-block:: python
+
+    with AutoInitContext() as auto_init_context:
+        auto_init_context.auto_init(Line)
+
+
+Intrusive Auto-Init Class
+-------------------------
 
 The original, intrusive auto-init create a sub-class of your class with the same name and in the sub-class
 adds an initialiser that accepts keyword arguments matching the type-annotated instance attribute names.

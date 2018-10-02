@@ -152,6 +152,7 @@ class AutoInitContext:
         if auto_init_context_stack.get() is None:
             auto_init_context_stack.set([])
         auto_init_context_stack.get().append(self)
+        return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         stack = auto_init_context_stack.get()
