@@ -2,6 +2,14 @@
 auto-init
 =========
 
+Installation
+------------
+
+.. code-block:: shell
+
+    pip install auto-init
+
+
 Changelog
 ---------
 
