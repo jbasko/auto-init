@@ -6,7 +6,7 @@ from __future__ import annotations
 from contextvars import ContextVar
 from typing import Any, Callable, ClassVar, Dict, List, Optional, Set, Tuple, Type, get_type_hints
 
-__version__ = '0.0.2'
+__version__ = '0.0.3'
 
 
 def none_factory(*args, **kwargs):
@@ -87,10 +87,17 @@ class AutoInitContext:
 
     current: AutoInitContext = _CurrentAutoInitContext()
 
-    def __init__(self, providers: Dict[Type, Any]=None, singleton_types: Set[Type]=None):
+    def __init__(self, providers: Dict[Type, Any]=None, singleton_types: Set[Type]=None, explicit_only: bool=None):
         self._providers = providers or {}
         self._singleton_types = singleton_types or set()
         self._singletons = {}
+
+        # If true, only types mentioned in the providers map will be initialised using the providers.
+        # All other will be initialised as Nones and won't use any default providers.
+        self.explicit_only = explicit_only
+
+    def has_provider(self, instance_type: Type) -> bool:
+        return instance_type in self._providers
 
     def get_provider(self, instance_type: Type) -> Optional[Callable]:
         """
@@ -119,7 +126,10 @@ class AutoInitContext:
 
         provider = self.get_provider(instance_type)
         if provider is None:
-            provider = InstanceType(instance_type)
+            if self.explicit_only:
+                provider = none_factory
+            else:
+                provider = InstanceType(instance_type)
 
         instance = provider(*(args or ()), **(kwargs or {}))
         if instance_type in self._singleton_types:
@@ -180,6 +190,8 @@ def init_attrs(instance: Any, attrs: Dict[str, Any], consume=True, auto_init=Tru
 
     Skips attributes that have already been initialised.
     """
+    context = AutoInitContext.current
+
     for k, v in collect_attrs(instance.__class__):
         if k in attrs:
             if consume:
@@ -187,11 +199,17 @@ def init_attrs(instance: Any, attrs: Dict[str, Any], consume=True, auto_init=Tru
             else:
                 setattr(instance, k, attrs[k])
         else:
-            if auto_init:
-                if hasattr(instance.__class__, k):
-                    setattr(instance, k, getattr(instance.__class__, k))
-                else:
-                    setattr(instance, k, AutoInitContext.current.auto_init(v))
+            if not auto_init:
+                continue
+
+            attr_value = getattr(instance.__class__, k, AutoInitContext.NOT_SET)
+            if attr_value is AutoInitContext.NOT_SET:
+                if not context.explicit_only or context.has_provider(v):
+                    setattr(instance, k, context.auto_init(v))
+            elif context.has_provider(v):
+                setattr(instance, k, context.auto_init(v))
+            else:
+                setattr(instance, k, attr_value)
 
 
 def auto_init_class(cls=None, singleton=False, repr=True, **cls_options):

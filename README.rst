@@ -13,12 +13,21 @@ Installation
 Changelog
 ---------
 
+v0.0.3
+^^^^^^
+
+* Added ``AutoInitContext.explicit_only`` -- allows marking the context as only initialising the types with specified
+  providers and leaving *untouched* all others.
+* If a type hint includes a default value (declares a class attribute) then the corresponding instance attribute will
+  be a copy by reference of the class attribute unless there is an explicit provider specified in the context.
+  This means that ``x: int = None`` will not be initialised as ``None``, not as ``0``.
+
 v0.0.2
 ^^^^^^
 
 * Non-intrusive auto-init: function ``auto_init`` and method ``AutoInitContext.auto_init`` that initialises instances
   without making any changes to user's classes.
-* Added ``singleton_types`` to ``AutoInitContext`` -- allows to specify singleton types non-intrusively.
+* Added ``AutoInitContext.singleton_types`` -- allows to specify singleton types non-intrusively.
 
 
 Non-Intrusive Auto-Init
@@ -210,11 +219,46 @@ which shouldn't be initialised by passing ``None`` as the provider:
 
     @auto_init_class
     class Db:
-        connection: Connection
+        connection: Connection = None
 
 
     with AutoInitContext(providers={Connection: None}):
         assert Db().connection is None
+
+
+If initialising attributes of all types seems a bit too much, you can use a context with ``explicit_only`` set to
+``True``:
+
+.. code-block:: python
+
+    class Db:
+        connection: Connection
+
+    with AutoInitContext(providers={Db: Db}, explicit_only=True):
+        db = auto_init(Db)
+        assert not hasattr(db, 'connection)
+
+
+Default Values
+--------------
+
+If in your class you annotate types and provide default values (effectively create class attributes) then they will
+be copied as instance attributes unless you specify an explicit provider in which case all default values will
+be replaced.
+
+.. code-block:: python
+
+    class Db:
+        connection: Connection = None
+
+    assert auto_init(Db).connection is None
+
+    with AutoInitContext(providers={Connection: -1}) as context:
+        assert context.auto_init(Db).connection == -1)
+
+In other words, ``connection: Connection`` is very different from ``connection: Connection = None``
+because in the latter case ``None`` will not be replaced unless a provider for ``Connection`` class
+is explicitly listed.
 
 
 Inheritance Works
