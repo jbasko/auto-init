@@ -22,7 +22,7 @@ setup(
     author_email='jazeps.basko@gmail.com',
     maintainer='Jazeps Basko',
     maintainer_email='jazeps.basko@gmail.com',
-    description='Dataclasses reinvented, dependency injection, Python 3.7+',
+    description='Dependency injection in Python 3.7+',
     long_description=read('README.rst'),
     classifiers=[
         'Development Status :: 3 - Alpha',
