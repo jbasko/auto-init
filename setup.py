@@ -14,7 +14,7 @@ def read(fname):
 
 setup(
     name='auto-init',
-    version='0.0.3',
+    version='0.0.4',  # also in __init__.py
     packages=['auto_init'],
     url='https://github.com/jbasko/auto-init',
     license='MIT',
@@ -22,13 +22,15 @@ setup(
     author_email='jazeps.basko@gmail.com',
     maintainer='Jazeps Basko',
     maintainer_email='jazeps.basko@gmail.com',
-    description='Dependency injection in Python 3.7+',
+    description='Dependency injection in Python 3.6+',
+    keywords='dependency injection',
     long_description=read('README.rst'),
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Developers',
         'Programming Language :: Python',
         'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'License :: OSI Approved :: MIT License',
     ],
