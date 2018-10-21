@@ -1,13 +1,6 @@
 import pytest
 
-from auto_init.safe_context import AutoInitContext, _InitState
-
-
-@pytest.fixture
-def ctx() -> AutoInitContext:
-    ctx = AutoInitContext()
-    assert not ctx._pending_types
-    return ctx
+from auto_init.safe_context import _InitState
 
 
 @pytest.fixture

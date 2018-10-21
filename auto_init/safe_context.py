@@ -145,10 +145,11 @@ class AutoInitContext:
 
     def _new_instance(self, instance_type: Type):
         try:
+            instance_type = InstanceType(instance_type)
             return instance_type()
         except Exception as e:
             raise CreationFailed(
-                f"Creation of instance of type {instance_type} failed with an "
+                f"Creation of instance of type {instance_type.original_type} failed with an "
                 f"exception: {e!r}"
             ) from e
 
@@ -203,7 +204,12 @@ class AutoInitContext:
         Returns type hints for the specified instance type.
         """
         if instance_type not in self._type_hints:
-            self._type_hints[instance_type] = dict(get_type_hints(instance_type))
+            if InstanceType(instance_type).is_typing:
+                # Do not attempt to get type hints from typing.* classes because it doesn't work in Python 3.7
+                # and we are not expecting anything useful anyway.
+                self._type_hints[instance_type] = {}
+            else:
+                self._type_hints[instance_type] = dict(get_type_hints(instance_type))
         return self._type_hints[instance_type]
 
     def __enter__(self):
@@ -216,6 +222,9 @@ class AutoInitContext:
         stack = auto_init_context_stack.get()
         assert stack[-1] is self
         stack.pop()
+
+
+auto_init_context_stack = ContextVar('auto_init_context_stack', default=[AutoInitContext()])
 
 
 class _InitState:
@@ -257,4 +266,67 @@ class _InitState:
         return f'<{self.__class__.__name__} {self.instance_type.__name__!r}>'
 
 
-auto_init_context_stack = ContextVar('auto_init_context_stack', default=[AutoInitContext()])
+def none_factory():
+    return None
+
+
+class InstanceType(str):
+    """
+    Type annotations helper. Represents a type hint as a string.
+    """
+
+    def __new__(cls, instance_type):
+        s = super().__new__(cls, instance_type)
+        s._instance_type = instance_type
+        return s
+
+    @property
+    def original_type(self) -> Type:
+        return self._instance_type
+
+    @property
+    def is_typing(self):
+        return self.startswith('typing.')
+
+    @property
+    def is_forward_ref(self):
+        return self.startswith('ForwardRef(')
+
+    @property
+    def is_list(self):
+        return self.startswith('typing.List[') or self == 'typing.List'
+
+    @property
+    def is_dict(self):
+        return self.startswith('typing.Dict[') or self == 'typing.Dict'
+
+    @property
+    def is_classvar(self):
+        return self.startswith('typing.ClassVar[') or self == 'typing.ClassVar'
+
+    @property
+    def is_tuple(self):
+        return self.startswith('typing.Tuple[') or self == 'typing.Tuple'
+
+    @property
+    def factory(self) -> Type:
+        if self.is_typing:
+            if self.is_list:
+                return list
+            elif self.is_dict:
+                return dict
+            else:
+                return none_factory
+        elif self.is_forward_ref:
+            return none_factory
+        else:
+            return self._instance_type
+
+    def __call__(self, *args, **kwargs):
+        """
+        Create a new instance of this type.
+        """
+        try:
+            return self.factory(*args, **kwargs)
+        except TypeError:
+            raise

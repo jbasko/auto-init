@@ -39,7 +39,7 @@ Simple Example
 Note that the ``Point`` class could also be a dataclass and it would work too.
 
 
-Not so Simple Example
+Not So Simple Example
 ---------------------
 
 .. code-block:: python
@@ -109,6 +109,17 @@ API
 
 Changelog
 +++++++++
+
+v0.0.5
+------
+
+* Supports initialising attributes annotated with ``typing.List`` and ``typing.Dict`` as empty lists or dictionaries.
+  Other ``typing.*``-annotated attributes are initialised as ``None``.
+* Do not attempt to get type hints from ``typing.*`` classes, it raises exceptions in Python 3.7 and does not return
+  anything useful in Python 3.6 anyway.
+* Fixes dependencies for Python 3.6, removes unnecessary ``contextvars`` and ``dataclasses``
+  dependencies for Python 3.7.
+* Travis CI setup.
 
 v0.0.4
 ------

@@ -3,14 +3,6 @@ import time
 from typing import Dict
 
 import dataclasses as dataclasses
-import pytest
-
-from auto_init import AutoInitContext
-
-
-@pytest.fixture
-def ctx():
-    return AutoInitContext()
 
 
 class Timer:
